@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define CEBC_VERSION_NUMBER "1.0.1"
+
 #define DEFAULT_C_FILE_OUTPUT_FILENAME "cebc_out.c"
 #define DEFAULT_BINARY_OUTPUT_NAME "cebc_out"
 
@@ -52,6 +54,8 @@ int write_file_contents(const char* input_filename, FILE* output_file, const cha
 
 void write_file_ending(enum alloc_type mem_type, FILE* output_file);
 
+void print_options_and_exit();
+
 int main(int argc, char** argv){
 
     enum alloc_type memory_type = STATIC; // Default to static memory
@@ -69,7 +73,11 @@ int main(int argc, char** argv){
         // Argument indicated as option flag
         if(argv[i][0] == '-'){
 
-            if(!strcmp(argv[i] + 1, "o")){
+            if(!strcmp(argv[i] + 1, "h")){
+                print_options_and_exit();
+            }// List flags
+
+            else if(!strcmp(argv[i] + 1, "o")){
                 output_name = argv[++i];
             }// Specify custom output file name
 
@@ -110,7 +118,7 @@ int main(int argc, char** argv){
                     return 1;
                 }// Error reallocating
 
-                input_filenames[input_filenames_count] = argv[i++];
+                input_filenames[input_filenames_count] = argv[i];
                 input_filenames_allocated_size = 1;
             }
 
@@ -127,7 +135,7 @@ int main(int argc, char** argv){
                     input_filenames = tmp_ptr;
                 }
 
-                input_filenames[input_filenames_count] = argv[i++];
+                input_filenames[input_filenames_count] = argv[i];
             }
 
             input_filenames_count++;
@@ -163,7 +171,6 @@ int main(int argc, char** argv){
     write_file_opening(memory_type, output_file, block_amount);
     
     for(int i = 0; i < input_filenames_count; i++){// Write all files to c
-        printf("%s\n", input_filenames[i]);
         if(!write_file_contents(input_filenames[i], output_file, c_filename)){
             printf("cebc: Error: unequal conditional brackets '[' ']' (no matching) \n");
             fclose(output_file);
@@ -287,4 +294,18 @@ void write_file_ending(enum alloc_type mem_type, FILE* output_file){
     if(mem_type == DYNAMIC){
         fprintf(output_file, "free(b);\nreturn 0;\n}");
     }// Dynamic allocation
+}
+
+void print_options_and_exit(){
+
+    printf("Cerebral-Compiler 'cebc': Version - %s\n", CEBC_VERSION_NUMBER);
+    puts("Options: --------------------------------------------------------------------");
+    puts(" '-h'  Print all options for cebc");
+    puts(" '-o'  Specify the name of the output binary or c-file");
+    puts(" '-b'  Specify the number of blocks allocated from memory (default is 30,000)");
+    puts(" '-s'  Generate binary / c-file with static memory allocation");
+    puts(" '-d'  Generate binary / c-file with dynamic memory allocation");
+    puts(" '-c'  Generate c-file only, don't compile to executible");
+
+    exit(0);
 }
