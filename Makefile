@@ -1,2 +1,2 @@
 all:
-	gcc -o cebc cebc.c
+	gcc -o cebc main.c

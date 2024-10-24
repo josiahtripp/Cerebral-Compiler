@@ -7,16 +7,17 @@
 #define DEFAULT_C_FILE_OUTPUT_FILENAME "cebc_out.c"
 #define DEFAULT_BINARY_OUTPUT_NAME "cebc_out"
 
-enum alloc_type { // Determines block allocation in c-file
+typedef enum alloc_type { // Determines block allocation in c-file
     STATIC,
     DYNAMIC
-};
+} alloc_type;
 
-enum process_type{ // Determines if the just the c file should be built or full compile
+typedef enum process_type{ // Determines if just the c file should be built or full compile process
     BUILD_C_FILE,
     COMPILE
-};
+} process_type;
 
+/* Templates for creating c-file output */
 static char*  c_file_template_static[] = {
 
     "#include <stdio.h>\n",
@@ -48,99 +49,45 @@ static char*  c_file_template_dynamic[] = {
     NULL,
 };
 
+/*
+    Writes opening portion of c-file (from template)
+    Writes based on passed memory allocation type
+*/
 void write_file_opening(enum alloc_type mem_type, FILE* output_file, __uint32_t block_amount);
 
+/*
+    Reads through a .bf file and inteprets & writes to output c-file
+*/
 int write_file_contents(const char* input_filename, FILE* output_file, const char* output_filename);
 
+/*
+    Finishes c-file writing by returning 0 and closing main (adds free() if memory is dynamic)
+*/
 void write_file_ending(enum alloc_type mem_type, FILE* output_file);
 
+/* 
+    Parses args & returns the number of input filenames loaded 
+*/
+__uint32_t parse_args(int argc, char** argv);
+
+/*
+    -h / --help argument command
+*/
 void print_options_and_exit();
+
+/* Compilation Properties */
+alloc_type memory_type = STATIC; // Default to static allocation
+process_type process = COMPILE; // Default to full compile process
+__uint32_t block_amount = 30000; // Default to 30,000 blocks
+
+/* Filenames */
+char** input_filenames = NULL;
+char* output_name = NULL; // Output c-file or binary name
+__uint32_t input_filenames_count = 0; // The number of .bf files loaded in to be compiled
 
 int main(int argc, char** argv){
 
-    enum alloc_type memory_type = STATIC; // Default to static memory
-    enum process_type process = COMPILE; // Default to full process
-    char** input_filenames = NULL; // All files to be compiled
-    __uint32_t input_filenames_allocated_size = 0; // Space allocated in input_filenames
-    __uint32_t input_filenames_count = 0; // The number of files to be compiled
-    char* output_name = NULL; // Default output file
-    __uint32_t block_amount = 30000; // As per standard Brainf*ck, defautlt limit of 30,000 blocks
-
-
-    // Parse arguments
-    for(int i = 1; i < argc; i++){
-
-        // Argument indicated as option flag
-        if(argv[i][0] == '-'){
-
-            if(!strcmp(argv[i] + 1, "h")){
-                print_options_and_exit();
-            }// List flags
-
-            else if(!strcmp(argv[i] + 1, "o")){
-                output_name = argv[++i];
-            }// Specify custom output file name
-
-            else if(!strcmp(argv[i] + 1, "b")){
-                block_amount = atoi(argv[++i]);
-
-                if(!block_amount){
-                    printf("cebc: Error: invalid block amount '%s'\n", argv[i]);
-                }
-            }// Set custom block amount
-
-            else if(!strcmp(argv[i] + 1, "s")){
-                memory_type = STATIC;
-            }// Set memory type to static
-
-            else if(!strcmp(argv[i] + 1, "d")){
-                memory_type = DYNAMIC;
-            }// Set memory type to dynamic
-
-            else if(!strcmp(argv[i] + 1, "c")){
-                process = BUILD_C_FILE;
-            }// Set process to partial
-
-            else{
-                printf("cebc: Error: invalid option flag '%s'\n", argv[i]);
-                return 1;
-            }// Invalid option flag
-        }
-
-        // Argument is treated as an input filename
-        else{
-
-            if(!input_filenames_count){// First filename
-                input_filenames = malloc(sizeof(char*));
-                
-                if(!input_filenames){
-                    printf("cebc: Error: malloc failure while loading filename(s)\n");
-                    return 1;
-                }// Error reallocating
-
-                input_filenames[input_filenames_count] = argv[i];
-                input_filenames_allocated_size = 1;
-            }
-
-            else{// Additional filenames
-                if(input_filenames_count + 1 > input_filenames_allocated_size){// Needs to be reallocated
-                    input_filenames_allocated_size *= 2;
-                    char** tmp_ptr = realloc(input_filenames, input_filenames_allocated_size * sizeof(char*));
-
-                    if(!tmp_ptr){
-                        printf("cebc: Error: realloc failure while loading filename(s)\n");
-                        return 1;
-                    }// Error reallocating
-
-                    input_filenames = tmp_ptr;
-                }
-
-                input_filenames[input_filenames_count] = argv[i];
-            }
-
-            input_filenames_count++;
-        }
-    }
+    input_filenames_count = parse_args(argc, argv);
 
     if(!input_filenames_count){
         printf("cebc: Error: no input file(s)\n");
@@ -308,4 +255,85 @@ void print_options_and_exit(){
     puts(" '-c'  Generate c-file only, don't compile to executible");
 
     exit(0);
+}
+
+__uint32_t parse_args(int argc, char** argv){
+
+    __uint32_t input_filenames_allocated_size = 0; // The capacity, in char* elements, currenly allocated
+    __uint32_t input_filenames_count = 0; // The current number of filenames loaded (used for return)
+
+    // Parse arguments
+    for(int i = 1; i < argc; i++){
+
+        // Argument indicated as option flag
+        if(argv[i][0] == '-'){
+
+            if(!strcmp(argv[i] + 1, "h")){
+                print_options_and_exit();
+            }// List flags
+
+            else if(!strcmp(argv[i] + 1, "o")){
+                output_name = argv[++i];
+            }// Specify custom output file name
+
+            else if(!strcmp(argv[i] + 1, "b")){
+                block_amount = atoi(argv[++i]);
+
+                if(!block_amount){
+                    printf("cebc: Error: invalid block amount '%s'\n", argv[i]);
+                }
+            }// Set custom block amount
+
+            else if(!strcmp(argv[i] + 1, "s")){
+                memory_type = STATIC;
+            }// Set memory type to static
+
+            else if(!strcmp(argv[i] + 1, "d")){
+                memory_type = DYNAMIC;
+            }// Set memory type to dynamic
+
+            else if(!strcmp(argv[i] + 1, "c")){
+                process = BUILD_C_FILE;
+            }// Set process to partial
+
+            else{
+                printf("cebc: Error: invalid option flag '%s'\n", argv[i]);
+                return 1;
+            }// Invalid option flag
+        }
+
+        // Argument is treated as an input filename
+        else{
+
+            if(!input_filenames_count){// First filename
+                input_filenames = malloc(sizeof(char*));
+                
+                if(!input_filenames){
+                    printf("cebc: Error: malloc failure while loading filename(s)\n");
+                    return 1;
+                }// Error reallocating
+
+                input_filenames[input_filenames_count] = argv[i];
+                input_filenames_allocated_size = 1;
+            }
+
+            else{// Additional filenames
+                if(input_filenames_count + 1 > input_filenames_allocated_size){// Needs to be reallocated
+                    input_filenames_allocated_size *= 2;
+                    char** tmp_ptr = realloc(input_filenames, input_filenames_allocated_size * sizeof(char*));
+
+                    if(!tmp_ptr){
+                        printf("cebc: Error: realloc failure while loading filename(s)\n");
+                        return 1;
+                    }// Error reallocating
+
+                    input_filenames = tmp_ptr;
+                }
+
+                input_filenames[input_filenames_count] = argv[i];
+            }
+
+            input_filenames_count++;
+        }
+    }
 }
